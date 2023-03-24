@@ -1,2 +1,2 @@
 # pyntlmx
- Extract Net-NTLMv2 hashes from NTLMSSP HTTP Authentication
+ Extract Net-NTLMv2 hashes from NTLMSSP HTTP Authentication pcap files
