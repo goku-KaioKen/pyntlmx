@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import pyshark
 import argparse
 
@@ -96,17 +97,20 @@ def print_hashes(output_format, hashes):
 
 def main():
     parser = argparse.ArgumentParser(description="Extract NetNTLMv2 hashes from a pcap file with NTLMSSP authentication")
-    parser.add_argument("-t", "--type", metavar="format", type=int, help="Hash output format (0 => Hashcat; 1 => John)")
-    parser.add_argument("-f", "--file", metavar="pcap", type=str, help="PCAP file path")
+    parser.add_argument("-t", "--type", metavar="format", type=int, required=True, help="Hash output format (0 => Hashcat; 1 => John)")
+    parser.add_argument("-f", "--file", metavar="pcap", type=str, required=True, help="PCAP file path")
     args = parser.parse_args()
 
     format = args.type
-    path = args.file
-
-    if not format or not path:
-        print("Error: missing required arguments")
-        parser.print_help()
+    if format not in [0, 1]:
+        print(f"[!] Incorrect format. Please provide either 0 for hashcat or 1 for john.")
         exit(1)
+
+    path = args.file
+    if not os.path.exists(path):
+        print(f"[!] The pcap file does not exist at \"{path}\".")
+        exit(1)
+
     try:
         cap = pyshark.FileCapture(path, display_filter="ntlmssp")
     except FileNotFoundError as e:
