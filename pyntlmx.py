@@ -3,74 +3,74 @@
 import pyshark
 import argparse
 
-def extract_ntlmssp(packet):
-    """
-    Extracts NTLMSSP details from a packet
+def extract_ntlmssp_details(cap):
+    """Extracts NTLMSSP details from a pcap capture.
 
     Args:
-        packet: A pyshark packet object
+        cap (pyshark.FileCapture): A pyshark file capture object.
 
     Returns:
-        A pyshark NTLMSSP object or None if no NTLMSSP details were found
+        dict: A dictionary of NTLMSSP details, with stream IDs as keys and dictionaries of details as values.
     """
-    if "<HTTP " in str(packet.layers):
-        return packet.http.ntlmssp
-    else:
-        return None
+    packs = {}
+    for pack in cap:
+        data = get_packet_data(pack)
+        if data:
+            try:
+                stream_id = pack.tcp.stream
+                if data.ntlmssp_messagetype == "0x00000002":
+                    add_challenge(packs, stream_id, data.ntlmssp_ntlmserverchallenge)
+                elif data.ntlmssp_messagetype == "0x00000003":
+                    add_response(packs, stream_id, data.ntlmssp_auth_username, data.ntlmssp_auth_domain, data.ntlmssp_auth_ntresponse)
+            except Exception:
+                pass
+    return packs
 
-def extract_challenge(packet):
-    """
-    Extracts the NTLMSSP challenge from a packet
+
+def get_packet_data(pack):
+    """Extracts relevant packet data from a pyshark packet.
 
     Args:
-        packet: A pyshark packet object
+        pack (pyshark.packet.packet): A pyshark packet object.
 
     Returns:
-        The NTLMSSP challenge as a string, or None if no challenge was found
+        pyshark.packet.layers.*: The relevant packet data, or None if none is found.
     """
-    ntlmssp = extract_ntlmssp(packet)
-    if ntlmssp and ntlmssp.ntlmssp_messagetype == "0x00000002":
-        return ntlmssp.ntlmssp_ntlmserverchallenge.replace(":", "")
-    else:
-        return None
+    data = None
+    if "<HTTP " in str(pack.layers):
+        data = pack.http
+    return data
 
-def extract_response(packet):
-    """
-    Extracts the NTLMSSP response from a packet
+
+def add_challenge(packs, stream_id, challenge):
+    """Adds a challenge to the packs dictionary.
 
     Args:
-        packet: A pyshark packet object
-
-    Returns:
-        A dictionary containing the NTLMSSP response details (username, domain, and response), or None if no response
-        was found
+        packs (dict): A dictionary of NTLMSSP details, with stream IDs as keys and dictionaries of details as values.
+        stream_id (int): The ID of the stream.
+        challenge (str): The NTLMSSP server challenge.
     """
-    ntlmssp = extract_ntlmssp(packet)
-    if ntlmssp and ntlmssp.ntlmssp_messagetype == "0x00000003":
-        domain = ntlmssp.auth_domain if ntlmssp.auth_domain != "NULL" else ""
-        return {"username": ntlmssp.auth_username, "domain": domain, "response": ntlmssp.auth_ntresponse.replace(":", "")}
-    else:
-        return None
+    if stream_id not in packs:
+        packs[stream_id] = {}
+    packs[stream_id]["challenge"] = challenge.replace(":", "")
 
-def extract_ntlmssp_details(packet):
-    """
-    Extracts NTLMSSP details from a packet
+
+def add_response(packs, stream_id, username, domain, response):
+    """Adds a response to the packs dictionary.
 
     Args:
-        packet: A pyshark packet object
-
-    Returns:
-        A dictionary containing the extracted details, or None if no details were found
+        packs (dict): A dictionary of NTLMSSP details, with stream IDs as keys and dictionaries of details as values.
+        stream_id (int): The ID of the stream.
+        username (str): The username from the NTLMSSP authentication.
+        domain (str): The domain from the NTLMSSP authentication.
+        response (str): The NTLMSSP authentication response.
     """
-    challenge = extract_challenge(packet)
-    response = extract_response(packet)
-    if challenge:
-        return {"stream": packet.tcp.stream, "challenge": challenge}
-    elif response:
-        response["stream"] = packet.tcp.stream
-        return response
-    else:
-        return None
+    if stream_id not in packs:
+        packs[stream_id] = {}
+    packs[stream_id]["username"] = username
+    packs[stream_id]["domain"] = domain if domain != "NULL" else ""
+    packs[stream_id]["response"] = response.replace(":", "")
+
 
 
 
@@ -103,10 +103,11 @@ def main():
     format = args.type
     path = args.file
 
-    if not format or not path:
-        print("Error: missing required arguments")
-        parser.print_help()
-        exit(1)
+   # if not format or not path:
+   
+   #     print("Error: missing required arguments")
+   #     parser.print_help()
+   #     exit(1)
     try:
         cap = pyshark.FileCapture(path, display_filter="ntlmssp")
     except FileNotFoundError as e:
