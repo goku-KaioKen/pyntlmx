@@ -16,15 +16,19 @@ def extract_ntlmssp_details(cap):
     packs = {}
     for pack in cap:
         data = get_packet_data(pack)
+
         if data:
             try:
                 stream_id = pack.tcp.stream
                 if data.ntlmssp_messagetype == "0x00000002":
                     add_challenge(packs, stream_id, data.ntlmssp_ntlmserverchallenge)
+
                 elif data.ntlmssp_messagetype == "0x00000003":
                     add_response(packs, stream_id, data.ntlmssp_auth_username, data.ntlmssp_auth_domain, data.ntlmssp_auth_ntresponse)
+
             except Exception:
                 pass
+
     return packs
 
 
@@ -38,8 +42,10 @@ def get_packet_data(pack):
         pyshark.packet.layers.*: The relevant packet data, or None if none is found.
     """
     data = None
+
     if "<HTTP " in str(pack.layers):
         data = pack.http
+
     return data
 
 
@@ -53,6 +59,7 @@ def add_challenge(packs, stream_id, challenge):
     """
     if stream_id not in packs:
         packs[stream_id] = {}
+
     packs[stream_id]["challenge"] = challenge.replace(":", "")
 
 
@@ -68,29 +75,33 @@ def add_response(packs, stream_id, username, domain, response):
     """
     if stream_id not in packs:
         packs[stream_id] = {}
+
     packs[stream_id]["username"] = username
     packs[stream_id]["domain"] = domain if domain != "NULL" else ""
     packs[stream_id]["response"] = response.replace(":", "")
 
 
-
-
 def print_hashes(output_format, hashes):
     hashes_keys = sorted(hashes.keys())
+
     for k in hashes_keys:
         arr = hashes[k]
+
         if len(arr) != 4:
             continue
+
         try:
             uname = arr["username"]
             chal = arr["challenge"]
             domain = arr["domain"]
             ntlm_1 = arr["response"][:32]
             ntlm_2 = arr["response"][32:]
+            
             if output_format == 1:
-                print(uname + ":$NETNTLMv2$" + domain + "$" + chal + "$" + ntlm_1 + "$" + ntlm_2)
+                print(f"{uname}:$NETNTLMv2${domain}${chal}${ntlm_1}${ntlm_2}")
             else:
-                print(uname + "::" + domain + ":" + chal + ":" + ntlm_1 + ":" + ntlm_2)
+                print(f"{uname}::{domain}:{chal}:{ntlm_1}:{ntlm_2}")
+
         except:
             pass
 
@@ -112,12 +123,12 @@ def main():
 
     try:
         cap = pyshark.FileCapture(path, display_filter="ntlmssp")
-    except FileNotFoundError as e:
-        print(e)
-        exit(1)
+        hashes = extract_ntlmssp_details(cap)
+        print_hashes(format, hashes)
 
-    hashes = extract_ntlmssp_details(cap)
-    print_hashes(format, hashes)
+    except Exception as e:
+        print(f"[!] {e}")
+        exit(1)
 
 
 if __name__ == '__main__':
