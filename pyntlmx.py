@@ -107,11 +107,9 @@ def main():
         exit(1)
 
     path = args.file
+    if not os.path.exists(path):
+        print(f"[!] The pcap file does not exist at \"{path}\".")
 
-    if not format or not path:
-        print("Error: missing required arguments")
-        parser.print_help()
-        exit(1)
     try:
         cap = pyshark.FileCapture(path, display_filter="ntlmssp")
     except FileNotFoundError as e:
